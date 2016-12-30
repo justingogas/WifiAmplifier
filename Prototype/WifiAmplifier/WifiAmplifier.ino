@@ -59,31 +59,14 @@ const char* ssid     = "yourSSID";
 const char* password = "yourpasswd";
 
 // Web page components.
-String header        = "<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>I <3 ESP8266</title><link rel='shortcut icon' href='http://www.jpellerin.info/bl0g/img/blog_ico.png' type='image/x-icon'><link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css'><link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css' /></head>";
-String header_Rfsh   = "<html><head><META HTTP-EQUIV='Refresh' CONTENT='1;URL=/leds'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>I <3 ESP8266</title><link rel='shortcut icon' href='http://www.jpellerin.info/bl0g/img/blog_ico.png' type='image/x-icon'><link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css'><link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css'><link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css' /></head>";
-String headerRfshTkr = "<html><head><META HTTP-EQUIV='Refresh' CONTENT='1;URL=/tkr'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>I <3 ESP8266</title><link rel='shortcut icon' href='http://www.jpellerin.info/bl0g/img/blog_ico.png' type='image/x-icon'><link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css'><link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css'><link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css' /></head>";
-String menu_btns     = "<br /><div class='row'><div class='col-xs-12 col-sm-12 col-md-6 col-md-offset-3'><center><div class='btn-group' role='group' aria-label='MENU'><a href='/leds' type='button' class='btn btn-md' style='background-color: #000; frameborder=1; border-color:#656565;'>Toggle LEDs <i class='fa fa-lightbulb-o'></i></a><a href='/adc' type='button' class='btn btn-md' style='background-color: #000; frameborder=1; border-color:#656565;'>A/D Converter <i class='fa fa-random'></i></a><a type='button' class='btn btn-md' style='background-color: #000; frameborder=1; border-color:#656565;' href='/tkr'>Ticker <i class='fa fa-spin fa-clock-o'></i></a></div></center></div></div>";
-String toggle0       = "<div class='col-xs-6 col-sm-6 col-md-3 col-md-offset-3' style='padding: 15px;'><div class='well' style='background-color: #001; color: ffd700; border-color:#000; padding: 15px;'><div class=''><center><form class='form-inline' action='led0'><div class='radio'><label><input type='radio' name='state' value='1' checked style='width: 55px; height: 55px'> On </label></div><div class='radio'><label><input type='radio' name='state' value='0' style='width: 35px; height: 35px'> Off </label></div><br /><button type='submit' class='btn btn-primary btn-lg' value=''>Toggle LED0</button></form></center></div></div></div>";
-String toggle2       = "<div class='col-xs-6 col-sm-6 col-md-3' style='padding: 15px;'><div class='well' style='background-color: #001; color: ffd700; border-color:#000; padding: 15px;'><div class=''><center><form class='form-inline' action='led2'><div class='radio'><label><input type='radio' name='state' value='1' checked style='width: 55px; height: 55px'> On </label></div><div class='radio'><label><input type='radio' name='state' value='0' style='width: 35px; height: 35px'> Off </label></div><br /><button type='submit' class='btn btn-primary btn-lg'  value=''>Toggle LED2</button></form></center></div></div></div>";
-String tkrForm0      = "<div class='row'><div class='col-xs-12 col-sm-12 col-md-12 col-lg-12'><div class='col-md-6 col-md-offset-3'><form class='form-inline' action='tkr0'><div class='form-group'><label for='LED OFF time in ms.'> ms. OFF </label><input type='number' class='form-control' id='off' name='off'  placeholder='55'></div><div class='form-group'><label for='LED ON time in ms.'> ms. ON </label><input type='number' class='form-control' id='on' name='on'  placeholder='56'></div><button type='submit' class='btn btn-default'>Start The Party!</button></form></div></div></div>";
-String adcFrame      = "<div class='row'><div class='col-xs-12 col-md-12 col-lg-12' style='text-align: center;'><iframe src='http://dev.jpellerin.info/ESP/adc.html' scrolling='no' align='center' height='200px' width='330px' frameborder=0; border-color:#000; background:#000; border-style:none;'></iframe></div></div>";
-String ledsFrame     = "<div class='row'><div class='col-xs-12 col-md-12 col-lg-12' style='text-align: center;'><iframe src='http://dev.jpellerin.info/ESP/leds.html' scrolling='no' align='center' height='125px' width='330px' frameborder=0; border-color:#000; background:#000; border-style:none;'></iframe></div></div>";
-String flameFrame    = "<div class='row'><div class='col-xs-12 col-md-12 col-lg-12' style='text-align: center;'><iframe src='http://dev.jpellerin.info/ESP/fire.html' scrolling='no' align='center' height='115px' width='330px' frameborder=0; border-color:#000; background:#000; border-style:none;'></iframe></div></div>";
-String tkrFrame      = "<div class='row'><div class='col-xs-12 col-md-12 col-lg-12' style='text-align: center;'><iframe src='http://dev.jpellerin.info/ESP/tkr.html' scrolling='no' align='center' height='175px' width='330px' frameborder=0; border-color:#000; background:#000; border-style:none;'></iframe></div></div>";
-String ESP_Sml_Frame = "<div class='row'><div class='col-xs-12 col-md-12 col-lg-12' style='text-align: center;'><iframe src='http://dev.jpellerin.info/ESP/esp_sml.html' scrolling='no' align='center' height='150px' width='255px' frameborder=0; border-color:#000; background:#000; border-style:none;'></iframe></div></div>";
-String rainbowFrame  = "<div class='row'><div class='col-xs-12 col-md-12 col-lg-12' style='text-align: center;'><iframe src='http://dev.jpellerin.info/ESP/rainbow.html' scrolling='no' align='center' height='200px' width='330px' frameborder=0; border-color:#000; background:#000; border-style:none;'></iframe></div></div>";  
-String cookieFrame   = "<div class='row'><div class='col-xs-12 col-md-12 col-lg-12' style='text-align: center;'><iframe src='http://dev.jpellerin.info/ESP/Cookie.html' scrolling='no' align='center' height='200px' width='330px' frameborder=0; border-color:#000; background:#000; border-style:none;'></iframe></div></div>";
-String ESP01Frame    = "<div class='row'><div class='col-xs-12 col-md-12 col-lg-12' style='text-align: center;'><iframe src='http://dev.jpellerin.info/ESP/esp01.html' scrolling='no' align='center' height='500px' width='650px' frameborder=0; border-color:#000; background:#000; border-style:none;'></iframe></div></div>";
-String ESP03Frame    = "<div class='row'><div class='col-xs-12 col-md-12 col-lg-12' style='text-align: center;'><iframe src='http://dev.jpellerin.info/ESP/esp03.html' scrolling='no' align='center' height='330px' width='330px' frameborder=0; border-color:#000; background:#000; border-style:none;'></iframe></div></div>";
-String jackFrame     = "<div class='row'><div class='col-xs-12 col-md-12 col-lg-12' style='text-align: center;'><iframe src='http://dev.jpellerin.info/ESP/jackBurton.html' scrolling='no' align='center' height='300px' width='330px' frameborder=0; border-color:#000; background:#000; border-style:none;'></iframe></div></div>";
-String brainFrame    = "<div class='row'><div class='col-xs-12 col-md-12 col-lg-12' style='text-align: center;'><iframe src='http://dev.jpellerin.info/ESP/brain.html' scrolling='no' align='center' height='500px' width='330px' frameborder=0; border-color:#000; background:#000; border-style:none;'></iframe></div></div>";
-String back          = "<div class='row'><div class='col-xs-12 col-md-6 col-md-offset-3'<br /><a type='button' href='/' class='btn btn-lg btn-block' style='background-color: #000; frameborder=1; border-color:#656565;''>Back To Main</a><br /></div></div>";
-String Chipset       = "<div class='row'><div class='col-md-12' style='text-align: center;'><h3><i class='fa fa-fire'></i> The Hottest Chipset This Side of the Matrix <i class='fa fa-fire-extinguisher'></i></h3></div></div>";
-String body_open     = "<body style='background-color: #000;'><div class='container'>";
-String row_open      = "<div class='row'>";
-String div_open      = "<div class='col-md-12'>";
-String div_close     = "</div>";
-String body_close    = "</div></body></html>";                                              
+String header        = "<!DOCTYPE html><html lang='en'><head> <meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>WiFi Amplifier</title><link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css'><script src='https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script><script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js'></script></head>";
+String body_open     = "<body style='padding-top: 70px;'><nav class='navbar navbar-inverse navbar-fixed-top'><div class='container-fluid'><div class='navbar-header'><button type='button' class='navbar-toggle collapsed' data-toggle='collapse' data-target='#navbar' aria-expanded='false' aria-controls='navbar'><span class='sr-only'>Toggle navigation</span><span class='icon-bar'></span><span class='icon-bar'></span><span class='icon-bar'></span></button><a class='navbar-brand' href='#'>WiFi Amplifier</a></div> <div id='navbar' class='collapse navbar-collapse'><ul class='nav navbar-nav'><li class='active'><a href='#'>Channels</a></li><li><a href='#network'>Network</a></li><li><a href='./muteall'>Mute all</a></li><li><a href='./maxall'>Max all</a></li></ul></div></div></nav><div class='container-fluid'>";
+String body_close    = "</div><script src='https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script><script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js'></script><script src='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/9.5.4/bootstrap-slider.min.js'></script></body></html>";
+
+String list_open     = "<ul class='list-group'>";
+String list_close    = "</ul>";
+
+String list_item     = "<li class='list-group-item'><span class='pull-right'><button onclick='$.get(\"./setvolume?channel=$channel&volume=0\");'><span class='glyphicon glyphicon-volume-off' aria-hidden='true'></span></button><button onclick='$.get(\"./setvolume?channel=$channel&volume=50\");'><span class='glyphicon glyphicon-volume-down' aria-hidden='true'></span></button><button onclick='$.get(\"./setvolume?channel=$channel&volume=100\");'><span class='glyphicon glyphicon-volume-up' aria-hidden='true'></span></button></span>$name</li>";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -244,7 +227,23 @@ void maxAllChannels() {
 // Begin ESP8266 web server code. ////////////////////////////////////////////////////////////////////////
 
 void root() {
-  server.send(200, "text/html", header + body_open + ledsFrame + rainbowFrame + row_open + toggle0 + toggle2 + div_close + back + body_close);
+
+  String channelMarkup = "";
+
+   // Iterate through all 8 multiplexed channels to detect i2c devices.
+  for (uint8_t i = MINAMPLIFIERS; i < MAXAMPLIFIERS; i++) {
+
+    if (channels[i].active) {
+
+      String newChannel = list_item;
+      newChannel.replace("$channel", String(i));
+      newChannel.replace("$name", channels[i].name);
+
+      channelMarkup += newChannel;      
+    }
+  }
+  
+  server.send(200, "text/html", header + body_open + list_open + channelMarkup + list_close + body_close);
 }
 
 
@@ -338,8 +337,8 @@ void setup() {
   // Connect to WiFi network.
   wifiSetup();
 }
- 
+
+
 void loop() {
-  // check for incomming client connections frequently in the main loop:
   server.handleClient();
 }
