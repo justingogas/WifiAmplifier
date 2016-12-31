@@ -44,7 +44,7 @@ extern "C" {
 typedef struct {
   boolean active = false;
   uint8_t volume = 0;
-  String name = "";  
+  String name = "Channel";  
 } channel;
 
 channel channels[MAXAMPLIFIERS];
@@ -55,18 +55,18 @@ ESP8266WebServer server(80);
 
 // WiFi credentials.
 // TODO: read ssid and password from EEPROM and run an access point to allow for non-hard-coded configuration.  http://www.john-lassen.de/en/projects/esp-8266-arduino-ide-webconfig
-const char* ssid     = "yourSSID";
-const char* password = "yourpasswd";
+const char* ssid     = "";
+const char* password = "";
 
 // Web page components.
 String header        = "<!DOCTYPE html><html lang='en'><head> <meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>WiFi Amplifier</title><link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css'><script src='https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script><script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js'></script></head>";
-String body_open     = "<body style='padding-top: 70px;'><nav class='navbar navbar-inverse navbar-fixed-top'><div class='container-fluid'><div class='navbar-header'><button type='button' class='navbar-toggle collapsed' data-toggle='collapse' data-target='#navbar' aria-expanded='false' aria-controls='navbar'><span class='sr-only'>Toggle navigation</span><span class='icon-bar'></span><span class='icon-bar'></span><span class='icon-bar'></span></button><a class='navbar-brand' href='#'>WiFi Amplifier</a></div> <div id='navbar' class='collapse navbar-collapse'><ul class='nav navbar-nav'><li class='active'><a href='#'>Channels</a></li><li><a href='#network'>Network</a></li><li><a href='./muteall'>Mute all</a></li><li><a href='./maxall'>Max all</a></li></ul></div></div></nav><div class='container-fluid'>";
+String body_open     = "<body style='padding-top: 70px;'><nav class='navbar navbar-inverse navbar-fixed-top'><div class='container-fluid'><div class='navbar-header'><button type='button' class='navbar-toggle collapsed' data-toggle='collapse' data-target='#navbar' aria-expanded='false' aria-controls='navbar'><span class='sr-only'>Toggle navigation</span><span class='icon-bar'></span><span class='icon-bar'></span><span class='icon-bar'></span></button><a class='navbar-brand' href='#'>WiFi Amplifier</a></div> <div id='navbar' class='collapse navbar-collapse'><ul class='nav navbar-nav'><li class='active'><a href='#'>Channels</a></li><li><a href='#network'>Network</a></li><li><a href='./mute-all'>Mute all</a></li><li><a href='./max-all'>Max all</a></li></ul></div></div></nav><div class='container-fluid'>";
 String body_close    = "</div><script src='https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script><script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js'></script><script src='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/9.5.4/bootstrap-slider.min.js'></script></body></html>";
 
 String list_open     = "<ul class='list-group'>";
 String list_close    = "</ul>";
 
-String list_item     = "<li class='list-group-item'><span class='pull-right'><button onclick='$.get(\"./setvolume?channel=$channel&volume=0\");'><span class='glyphicon glyphicon-volume-off' aria-hidden='true'></span></button><button onclick='$.get(\"./setvolume?channel=$channel&volume=50\");'><span class='glyphicon glyphicon-volume-down' aria-hidden='true'></span></button><button onclick='$.get(\"./setvolume?channel=$channel&volume=100\");'><span class='glyphicon glyphicon-volume-up' aria-hidden='true'></span></button></span>$name</li>";
+String list_item     = "<li class='list-group-item'><span class='pull-right'><button onclick='$.get(\"./volume?channel=$channel&volume=0\");'><span class='glyphicon glyphicon-volume-off' aria-hidden='true'></span></button><button onclick='$.get(\"./volume?channel=$channel&volume=50\");'><span class='glyphicon glyphicon-volume-down' aria-hidden='true'></span></button><button onclick='$.get(\"./volume?channel=$channel&volume=100\");'><span class='glyphicon glyphicon-volume-up' aria-hidden='true'></span></button></span>$name</li>";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -115,7 +115,9 @@ void setChannel(uint8_t i) {
   if (i >= MAXAMPLIFIERS) {
     return;
   }
- 
+
+  Serial.print("Setting active channel to "); Serial.println(i);
+  
   Wire.beginTransmission(TCAADDR);
   Wire.write(1 << i);
   Wire.endTransmission();  
@@ -124,7 +126,7 @@ void setChannel(uint8_t i) {
 
 // Setup i2c multiplexer.
 void channelsSetup() {
-  
+
   while (!Serial) {};
   delay(1000);
 
@@ -183,7 +185,8 @@ boolean setVolume(int8_t volume) {
   Serial.print("Setting volume to ");
   Serial.println(volume);
 
-  Wire.beginTransmission(TCAADDR);
+  //Wire.beginTransmission(TCAADDR);
+  Wire.beginTransmission(0x4B);
   Wire.write(volume);
 
   if (Wire.endTransmission() == 0) {
@@ -328,7 +331,7 @@ void setup() {
 
   // Begin the serial communication.
   Serial.begin(115200);
-  Serial.println("");
+  Serial.println("Starting setup.");
 
   // Run the i2c multiplexer initialization to detect how many amplifier channels are detected.
   Wire.begin();
