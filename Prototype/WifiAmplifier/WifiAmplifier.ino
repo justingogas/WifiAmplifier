@@ -73,29 +73,29 @@ String list_item     = "<li class='list-group-item'><span class='pull-right'><bu
 
 // Begin general functions (not specifically for the multiplexer or amplifiers). ///////////////////////////
 
-//String getChannel(uint8_t channel = 8);
-
-String getChannel() {
+// Get the parameters for a single channel if specified, or all channels if none specified.
+String getChannel(uint8_t channel = 8) {
 
   String returnString = "[";
 
-/*  if (channel != 8) {
+  if (channel != 8) {
     returnString += '{ "name": "' + channels[channel].name + '",';
     returnString += '"volume": ' + channels[channel].volume + ',';
     returnString += '"active": ' + channels[channel].active + '}';
   }
 
   else {
-*/
-  // Iterate through all 8 multiplexed channels to detect i2c devices.
-  for (uint8_t i = MINAMPLIFIERS; i < MAXAMPLIFIERS; i++) {
 
-    returnString += '{ "name": "' + channels[i].name + '",';
-    returnString += '"volume": ' + channels[i].volume + ',';
-    returnString += '"active": ' + channels[i].active + '}';
-
-    if (i <= MAXAMPLIFIERS) {
-      returnString += ",";
+    // Iterate through all 8 multiplexed channels to detect i2c devices.
+    for (uint8_t i = MINAMPLIFIERS; i < MAXAMPLIFIERS; i++) {
+  
+      returnString += '{ "name": "' + channels[i].name + '",';
+      returnString += '"volume": ' + channels[i].volume + ',';
+      returnString += '"active": ' + channels[i].active + '}';
+  
+      if (i <= MAXAMPLIFIERS) {
+        returnString += ",";
+      }
     }
   }
 
@@ -203,6 +203,7 @@ void muteAllChannels() {
       setChannel(i);
       channels[i].volume = MINVOLUME;
       setVolume(MINVOLUME);
+      Serial.print("Setting channel "); Serial.print(i); Serial.print(" to "); Serial.println(MINVOLUME);
     }
   }
 }
@@ -217,6 +218,7 @@ void maxAllChannels() {
       setChannel(i);
       channels[i].volume = MAXVOLUME;
       setVolume(MAXVOLUME);
+      Serial.print("Setting channel "); Serial.print(i); Serial.print(" to "); Serial.println(MAXVOLUME);
     }
   }
 }
@@ -239,7 +241,7 @@ void root() {
       newChannel.replace("$channel", String(i));
       newChannel.replace("$name", channels[i].name);
 
-      channelMarkup += newChannel;      
+      channelMarkup += newChannel;
     }
   }
   
@@ -266,7 +268,6 @@ void getchannels() {
 }
 
 
-
 // Note that the volume here is between 1 and 100 to signify a percentage, which is mapped to the amplifier's min and max.
 void setvolume() {
 
@@ -282,8 +283,7 @@ void setvolume() {
     // Send the new volume to the active channel.
     setChannel(channel);
     setVolume(channels[channel].volume);
-    //server.send(200, "text/json", getChannel(channel));
-    server.send(200, "text/json", getChannel());
+    server.send(200, "text/json", getChannel(channel));
   }
 
   // Either the channel or volume was invalid, so return an error.
