@@ -18,10 +18,11 @@
  *   GPIO 5 = i2c SCL
  *   3.3v = multiplexer Vin, amplifier Vi2c
  */
-
+// TODO: left off trying to get the initial configuration in the file.  Need to decide how the initialization is handled when the port scan is done - is the port scan the source of truth, or the stored configuration?)  Then add in AP mode for initialization.
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
+#include "FS.h"
 
 // i2c multiplexer values.
 #include "Wire.h"
@@ -39,12 +40,15 @@ extern "C" {
 #define MAXMAPPEDVOLUME 100
 #define MINAMPLIFIERS 0
 #define MAXAMPLIFIERS 8
+#define CHANNELSFILENAME "channels.txt"
+#define WIFIFILENAME "wifi.txt"
 
 // Define the channels as an array of structures.
 typedef struct {
   boolean active = false;
   uint8_t volume = 0;
-  String name = "Channel";  
+  String name = "Unnamed channel";
+  uint8_t address = 0x4B;
 } channel;
 
 channel channels[MAXAMPLIFIERS];
@@ -55,18 +59,78 @@ ESP8266WebServer server(80);
 
 // WiFi credentials.
 // TODO: read ssid and password from EEPROM and run an access point to allow for non-hard-coded configuration.  http://www.john-lassen.de/en/projects/esp-8266-arduino-ide-webconfig
-const char* ssid     = "";
+// TODO: show wifi strength in dB in web page:  WiFi.RSSI()
+const char* ssid = "";
 const char* password = "";
 
 // Web page components.
-String header        = "<!DOCTYPE html><html lang='en'><head> <meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>WiFi Amplifier</title><link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css'><script src='https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script><script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js'></script></head>";
-String body_open     = "<body style='padding-top: 70px;'><nav class='navbar navbar-inverse navbar-fixed-top'><div class='container-fluid'><div class='navbar-header'><button type='button' class='navbar-toggle collapsed' data-toggle='collapse' data-target='#navbar' aria-expanded='false' aria-controls='navbar'><span class='sr-only'>Toggle navigation</span><span class='icon-bar'></span><span class='icon-bar'></span><span class='icon-bar'></span></button><a class='navbar-brand' href='#'>WiFi Amplifier</a></div> <div id='navbar' class='collapse navbar-collapse'><ul class='nav navbar-nav'><li class='active'><a href='#'>Channels</a></li><li><a href='#network'>Network</a></li><li><a href='./mute-all'>Mute all</a></li><li><a href='./max-all'>Max all</a></li></ul></div></div></nav><div class='container-fluid'>";
-String body_close    = "</div><script src='https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script><script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js'></script><script src='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/9.5.4/bootstrap-slider.min.js'></script></body></html>";
+String header =
+  "<!DOCTYPE html><html lang='en'>"
+  "<head>"
+  " <meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>WiFi Amplifier</title>"
+  " <link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css'>"
+  " <script src='https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script>"
+  " <script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js'></script>"
+  "</head>";
 
-String list_open     = "<ul class='list-group'>";
-String list_close    = "</ul>";
+String body_open = 
+  "<body style='padding-top: 70px;'>"
+  " <nav class='navbar navbar-inverse navbar-fixed-top'>"
+  "   <div class='container-fluid'>"
+  "     <div class='navbar-header'>"
+  "       <button type='button' class='navbar-toggle collapsed' data-toggle='collapse' data-target='#navbar' aria-expanded='false' aria-controls='navbar'>"
+  "         <span class='sr-only'>Toggle navigation</span>"
+  "         <span class='icon-bar'></span>"
+  "         <span class='icon-bar'></span>"
+  "         <span class='icon-bar'></span>"
+  "       </button>"
+  "       <a class='navbar-brand' href='#'>WiFi Amplifier</a>"
+  "     </div>"
+  "     <div id='navbar' class='collapse navbar-collapse'>"
+  "       <ul class='nav navbar-nav'>"
+  "         <li class='active'><a href='#'>Channels</a></li>"
+  "         <li><a>Network</a></li>"
+  "         <li><a id='mute-all-button' style='cursor: pointer;'>Mute all</a></li>"
+  "         <li><a id='max-all-button' style='cursor: pointer;'>Max all</a></li>"
+  "       </ul>"
+  "     </div>"
+  "   </div>"
+  " </nav>"
+  " <div class='container-fluid'>";
 
-String list_item     = "<li class='list-group-item'><span class='pull-right'><button onclick='$.get(\"./volume?channel=$channel&volume=0\");'><span class='glyphicon glyphicon-volume-off' aria-hidden='true'></span></button><button onclick='$.get(\"./volume?channel=$channel&volume=50\");'><span class='glyphicon glyphicon-volume-down' aria-hidden='true'></span></button><button onclick='$.get(\"./volume?channel=$channel&volume=100\");'><span class='glyphicon glyphicon-volume-up' aria-hidden='true'></span></button></span>$name</li>";
+String body_close =
+  "   </div>"
+  "   <script src='https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script>"
+  "   <script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js'></script>"
+  "   <script src='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/9.5.4/bootstrap-slider.min.js'></script>"
+  "   <script type='text/javascript'>"
+  "     $('#mute-all-button').on('click', function() { var range = $(this); setVolume(-1, 0) });"
+  "     $('#max-all-button').on('click', function() { var range = $(this); setVolume(-1, 100) });"
+  "     $('[id^=mute-button]').on('click', function() { var range = $(this); setVolume(range.attr('data-channel'), 0) });"
+  "     $('[id^=max-button]').on('click', function() { var range = $(this); setVolume(range.attr('data-channel'), 100) });"
+  "     $('[id^=range-]').on('click', function() { var range = $(this); setVolume(range.attr('data-channel'), range.val()) });"
+  "     function setVolume(channel, volume) { $.get('./volume?channel=' + channel + '&volume=' + volume); }"
+  " </body>"
+  "</html>";
+
+String list_open = "<ul class='list-group'>";
+String list_close = "</ul>";
+
+String list_item = 
+  "<li class='list-group-item'>"
+  " $name"
+  " <span class='pull-right'>"
+  "   <div class='btn-group' role='group'>"
+  "     <button type='button' id='mute-button-$channel' class='btn btn-default' data-channel='$channel'>"
+  "       <span class='glyphicon glyphicon-volume-off' aria-hidden='true'></span>"
+  "     </button>"
+  "     <button type='button' id='max-button-$channel' class='btn btn-default' data-channel='$channel'>"
+  "       <span class='glyphicon glyphicon-volume-up' aria-hidden='true'></span>"
+  "     </button>"
+  "   </div>"
+  " </span>"
+  " <input type='range' min='0' max='100' id='range-$channel' data-channel='$channel' style='padding-top: 10px;'>"
+  "</li>";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -74,14 +138,12 @@ String list_item     = "<li class='list-group-item'><span class='pull-right'><bu
 // Begin general functions (not specifically for the multiplexer or amplifiers). ///////////////////////////
 
 // Get the parameters for a single channel if specified, or all channels if none specified.
-String getChannel(uint8_t channel = 8) {
+String getChannel(int8_t channel = -1) {
 
   String returnString = "[";
 
-  if (channel != 8) {
-    returnString += '{ "name": "' + channels[channel].name + '",';
-    returnString += '"volume": ' + channels[channel].volume + ',';
-    returnString += '"active": ' + channels[channel].active + '}';
+  if (channel != -1) {
+    returnString += '{ "name": "' + channels[channel].name + '",' + '"volume": ' + channels[channel].volume + ',' + '"address": ' + channels[channel].address + ',' + '"active": ' + channels[channel].active + '}';
   }
 
   else {
@@ -89,10 +151,8 @@ String getChannel(uint8_t channel = 8) {
     // Iterate through all 8 multiplexed channels to detect i2c devices.
     for (uint8_t i = MINAMPLIFIERS; i < MAXAMPLIFIERS; i++) {
   
-      returnString += '{ "name": "' + channels[i].name + '",';
-      returnString += '"volume": ' + channels[i].volume + ',';
-      returnString += '"active": ' + channels[i].active + '}';
-  
+      returnString += '{ "name": "' + channels[channel].name + '",' + '"volume": ' + channels[channel].volume + ',' + '"address": ' + channels[channel].address + ',' + '"active": ' + channels[channel].active + '}';
+
       if (i <= MAXAMPLIFIERS) {
         returnString += ",";
       }
@@ -102,6 +162,57 @@ String getChannel(uint8_t channel = 8) {
   returnString += "]";
 
   return returnString;
+}
+
+
+String getWifi() {
+
+  String wifiConfig = '{ "ssid": "' + (String)ssid + '", "password": "' + (String)password + '" }';
+  
+  return wifiConfig;
+}
+
+void configurationSetup() {
+
+  String channelsConfiguration = "";
+  String wifiConfiguration = "";
+
+  // Open the channels configuration file, if it exists.
+  File channelsFile = SPIFFS.open(CHANNELSFILENAME, "r");
+
+  // Write the default configuration to the file.
+  if (!channelsFile) {
+
+    Serial.println("No channels configuration file detected.  Creating a new one.");
+    channelsFile = SPIFFS.open(CHANNELSFILENAME, "w");
+    channelsFile.println(getChannel());
+    channelsFile.close();
+
+    channelsFile = SPIFFS.open(CHANNELSFILENAME, "r");
+  }
+
+  while (channelsFile.available()) {
+    channelsConfiguration += channelsFile.read();
+  }
+
+
+  // Open the wifi configuration file, if it exists.
+  File wifiFile = SPIFFS.open(WIFIFILENAME, "r");
+
+  // Write the default configuration to the file.
+  if (!wifiFile) {
+
+    Serial.println("No wifi configuration file detected.  Creating a new one.");
+    wifiFile = SPIFFS.open(WIFIFILENAME, "w");
+    wifiFile.println(getWifi());
+    wifiFile.close();
+
+    wifiFile = SPIFFS.open(WIFIFILENAME, "r");
+  }
+
+  while (wifiFile.available()) {
+    wifiConfiguration += wifiFile.read();
+  }
 }
 
 // End general functions (not specifically for the multiplexer or amplifiers). /////////////////////////////
@@ -154,9 +265,11 @@ void channelsSetup() {
         Serial.print("Found I2C 0x");  Serial.println(addr, HEX);
 
         // Try to communicate with the amplifier and set its default volume.
-        if (setVolume(DEFAULTVOLUME)) {
+        if (setVolume(DEFAULTVOLUME, addr)) {
+          channels[i].name = "Unnamed channel";
           channels[i].volume = DEFAULTVOLUME;
           channels[i].active = true;
+          channels[i].address = addr;
         }
       }
     }
@@ -171,7 +284,7 @@ void channelsSetup() {
 // Begin amplifier code.  ////////////////////////////////////////////////////////////////////////////////
 
 // Set the volume of the amplifier.
-boolean setVolume(int8_t volume) {
+boolean setVolume(uint8_t volume, uint8_t address) {
 
   // The volume is 0 <= v <= 63, so keep the input in this range.
   if (volume > 63) {
@@ -186,7 +299,7 @@ boolean setVolume(int8_t volume) {
   Serial.println(volume);
 
   //Wire.beginTransmission(TCAADDR);
-  Wire.beginTransmission(0x4B);
+  Wire.beginTransmission(address);
   Wire.write(volume);
 
   if (Wire.endTransmission() == 0) {
@@ -205,7 +318,7 @@ void muteAllChannels() {
     if (channels[i].active) {
       setChannel(i);
       channels[i].volume = MINVOLUME;
-      setVolume(MINVOLUME);
+      setVolume(MINVOLUME, channels[i].address);
       Serial.print("Setting channel "); Serial.print(i); Serial.print(" to "); Serial.println(MINVOLUME);
     }
   }
@@ -220,7 +333,7 @@ void maxAllChannels() {
     if (channels[i].active) {
       setChannel(i);
       channels[i].volume = MAXVOLUME;
-      setVolume(MAXVOLUME);
+      setVolume(MAXVOLUME, channels[i].address);
       Serial.print("Setting channel "); Serial.print(i); Serial.print(" to "); Serial.println(MAXVOLUME);
     }
   }
@@ -235,7 +348,7 @@ void root() {
 
   String channelMarkup = "";
 
-   // Iterate through all 8 multiplexed channels to detect i2c devices.
+   // Iterate through all multiplexed channels to detect i2c devices.
   for (uint8_t i = MINAMPLIFIERS; i < MAXAMPLIFIERS; i++) {
 
     if (channels[i].active) {
@@ -285,7 +398,7 @@ void setvolume() {
 
     // Send the new volume to the active channel.
     setChannel(channel);
-    setVolume(channels[channel].volume);
+    setVolume(channels[channel].volume, channels[channel].address);
     server.send(200, "text/json", getChannel(channel));
   }
 
@@ -295,6 +408,30 @@ void setvolume() {
   }
 }
 
+
+// Save the configuration to files.
+void saveconfig() {
+
+  // Open the channels configuration file, if it exists.
+  File channelsFile = SPIFFS.open(CHANNELSFILENAME, "w");
+  
+  if (!channelsFile) {
+    Serial.println("Error writing the channels configuration file.");
+  } else {
+    channelsFile.println(getChannel());
+    channelsFile.close();
+  }
+
+  // Open the wifi configuration file, if it exists.
+  File wifiFile = SPIFFS.open(WIFIFILENAME, "w");
+
+  if (!wifiFile) {
+    Serial.println("Error writing the channels configuration file.");
+  } else {
+    wifiFile.println(getWifi());
+    wifiFile.close();
+  }
+}
 
 void wifiSetup() {
 
@@ -314,10 +451,11 @@ void wifiSetup() {
   
   // Set up the endpoints for HTTP server.  The functions are named very particularly, and will not compile if the function name is greater than 8 characters and contains a capital letter, but will accept a capital letter if it is less than 8 characters.
   server.on("/", root);
-  server.on("/channels", getchannels); // Get the number of channels and their volume.
-  server.on("/volume", setvolume); // Process a volume command for a specific channel.
-  server.on("/mute-all", muteall);
-  server.on("/max-all", maxall);
+  server.on("/channels", getchannels);    // Get the number of channels and their volume.
+  server.on("/volume", setvolume);        // Process a volume command for a specific channel.
+  server.on("/mute-all", muteall);        // Mute all channels.
+  server.on("/max-all", maxall);          // Max all channels.
+  server.on("/save-config", saveconfig);  // Save current configuration.
 
   // Start the server.
   server.begin();
@@ -332,6 +470,10 @@ void setup() {
   // Begin the serial communication.
   Serial.begin(115200);
   Serial.println("Starting setup.");
+
+  // Initialize the SPIFFS file system to read / write the configuration.
+  configurationSetup();
+  SPIFFS.begin();
 
   // Run the i2c multiplexer initialization to detect how many amplifier channels are detected.
   Wire.begin();
