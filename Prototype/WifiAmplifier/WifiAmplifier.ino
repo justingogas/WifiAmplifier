@@ -23,6 +23,7 @@
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include "FS.h"
+#include <ArduinoJson.h>
 
 // i2c multiplexer values.
 #include "Wire.h"
@@ -42,6 +43,8 @@ extern "C" {
 #define MAXAMPLIFIERS 8
 #define CHANNELSFILENAME "channels.txt"
 #define WIFIFILENAME "wifi.txt"
+#define APSSID "WiFi amplifier"
+#define APPASSWORD "admin"
 
 // Define the channels as an array of structures.
 typedef struct {
@@ -59,7 +62,6 @@ ESP8266WebServer server(80);
 
 // WiFi credentials.
 // TODO: read ssid and password from EEPROM and run an access point to allow for non-hard-coded configuration.  http://www.john-lassen.de/en/projects/esp-8266-arduino-ide-webconfig
-// TODO: show wifi strength in dB in web page:  WiFi.RSSI()
 const char* ssid = "";
 const char* password = "";
 
@@ -89,9 +91,19 @@ String body_open =
   "     <div id='navbar' class='collapse navbar-collapse'>"
   "       <ul class='nav navbar-nav'>"
   "         <li class='active'><a href='#'>Channels</a></li>"
-  "         <li><a>Network</a></li>"
   "         <li><a id='mute-all-button' style='cursor: pointer;'>Mute all</a></li>"
   "         <li><a id='max-all-button' style='cursor: pointer;'>Max all</a></li>"
+  "         <li><a href='./save'>Save</a></li>"
+  "         <li class='dropdown'>"
+  "           <a href='#' class='dropdown-toggle' data-toggle='dropdown' aria-haspopup='true' aria-expanded='false'>Network <span class='caret'></span></a>"
+  "           <ul class='dropdown-menu' role='menu' style='min-width: 200px;'>"
+  "             <form class='form' role='form' method='post' action='./network'>"
+  "               <li>IP: $ip, strength: $strength"
+  "               <li><input type='text' class='form-control' name='ssid' placeholder='Network SSID' required></li>"
+  "               <li><input type='text' class='form-control' name='ssid' placeholder='Network password' required></li>"
+  "               <li><input type='submit' class='btn btn-primary btn-block' value='Save and reset'></li>"
+  "             </form>"
+  "           </ul>"
   "       </ul>"
   "     </div>"
   "   </div>"
@@ -165,12 +177,19 @@ String getChannel(int8_t channel = -1) {
 }
 
 
-String getWifi() {
+String getWifi(String inputSsid = "", String inputPassword = "") {
 
-  String wifiConfig = '{ "ssid": "' + (String)ssid + '", "password": "' + (String)password + '" }';
-  
+  String wifiConfig = "";
+
+  if (inputSsid == "" && inputPassword == "") {
+    String wifiConfig = '{ "ssid": "' + inputSsid + '", "password": "' + inputPassword + '" }';
+  } else {
+    String wifiConfig = '{ "ssid": "' + (String)ssid + '", "password": "' + (String)password + '" }';
+  }
+
   return wifiConfig;
 }
+
 
 void configurationSetup() {
 
@@ -213,6 +232,21 @@ void configurationSetup() {
   while (wifiFile.available()) {
     wifiConfiguration += wifiFile.read();
   }
+
+  StaticJsonBuffer<200> jsonBuffer;
+  JsonObject& wifiJson = jsonBuffer.parseObject(wifiConfiguration);
+
+  if (!wifiJson.success()) {
+    Serial.println("JSON parsing of wifi configuration failed.  Setting default values.");
+    ssid = "";
+    password = "";
+  }
+
+  else {
+    ssid = wifiJson["ssid"];
+    password = wifiJson["password"];
+  }
+
 }
 
 // End general functions (not specifically for the multiplexer or amplifiers). /////////////////////////////
@@ -360,7 +394,14 @@ void root() {
       channelMarkup += newChannel;
     }
   }
-  
+
+  /*char ipAddress[16];
+  IPAddress ip = WiFi.localIP();
+  sprintf(ipAddress, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+*/
+  //String bodyMarkup = body_open; //.replace("$ip", ipAddress);
+  //bodyMarkup = bodyMarkup.replace("$strength", String(WiFi.RSSI()));
+ 
   server.send(200, "text/html", header + body_open + list_open + channelMarkup + list_close + body_close);
 }
 
@@ -383,6 +424,16 @@ void getchannels() {
   server.send(200, "text/json", getChannel());
 }
 
+
+// Save the new channel configuration.
+void save() {
+
+  // TODO: gather up the channel text labels and submit and save.
+
+  // Redirect back to the index page.
+  server.sendHeader("Location", String("/"), true);
+  server.send (302, "text/plain", "");
+}
 
 // Note that the volume here is between 1 and 100 to signify a percentage, which is mapped to the amplifier's min and max.
 void setvolume() {
@@ -408,6 +459,23 @@ void setvolume() {
   }
 }
 
+
+void network() {
+
+  if (server.hasArg("ssid") && server.hasArg("password")) {
+    
+    // Open the wifi configuration file, if it exists.
+    File wifiFile = SPIFFS.open(WIFIFILENAME, "w");
+    wifiFile.println(getWifi((String)server.arg("ssid"), (String)server.arg("password")));
+    wifiFile.close();
+
+    // Reset the module so the new configuration gets loaded.
+    ESP.reset();
+
+  } else {
+    server.send(400);
+  }
+}
 
 // Save the configuration to files.
 void saveconfig() {
@@ -435,27 +503,51 @@ void saveconfig() {
 
 void wifiSetup() {
 
-  WiFi.begin(ssid, password);
-
-  // Wait for connection
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print("*");
+  // If no wifi configuration could be loaded, then go into AP mode.
+  if (ssid == "" && password == "") {
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(APSSID, APPASSWORD);
   }
 
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(ssid);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-  
+  // Configuration was loaded, so attempt to connect to it.
+  else {
+
+    uint8_t attemptSeconds = 0;
+
+    // Attempt to connect to the default network.  If no connection is made in 30 seconds, then start in AP mode so that the network can be set.
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
+
+    while (WiFi.status() != WL_CONNECTED && attemptSeconds < 30) {
+      delay(1000);
+      Serial.print("*");
+      attemptSeconds++;
+    }
+
+    // Connection is successful to the default network, so start the server.
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("");
+      Serial.print("Connected to ");
+      Serial.println(ssid);
+      Serial.print("IP address: ");
+      Serial.println(WiFi.localIP());
+    }
+
+    // The connection was not successful, so start the AP mode.
+    else {
+      WiFi.mode(WIFI_AP);
+      WiFi.softAP(APSSID, APPASSWORD);
+    }
+  }
+
   // Set up the endpoints for HTTP server.  The functions are named very particularly, and will not compile if the function name is greater than 8 characters and contains a capital letter, but will accept a capital letter if it is less than 8 characters.
   server.on("/", root);
   server.on("/channels", getchannels);    // Get the number of channels and their volume.
+  server.on("/network", network);         // Receive new network configuration and reset the server.
   server.on("/volume", setvolume);        // Process a volume command for a specific channel.
   server.on("/mute-all", muteall);        // Mute all channels.
   server.on("/max-all", maxall);          // Max all channels.
-  server.on("/save-config", saveconfig);  // Save current configuration.
+  server.on("/save", saveconfig);  // Save current configuration.
 
   // Start the server.
   server.begin();
