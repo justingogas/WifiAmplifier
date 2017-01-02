@@ -1,8 +1,4 @@
----
-title: Wifi Amplifier
----
-
-## About
+## Wifi amplifier
 
 A multi-channel sound amplifier controllable over wifi.  This can be used for whole-house audio where the amplifier is in a central location and speaker wire in the wall brings the signal into each room, and each room's volume can be controlled with a wifi application.  There are premium systems that do this that can cost thousands of dollars and may not have a web interface, so this project is to build such a system as cheaply as possible.
 
