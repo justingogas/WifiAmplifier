@@ -100,7 +100,7 @@ String body_open =
   "             <form class='form' role='form' method='post' action='./network'>"
   "               <li>IP: $ip, strength: $strength"
   "               <li><input type='text' class='form-control' name='ssid' placeholder='Network SSID' required></li>"
-  "               <li><input type='text' class='form-control' name='ssid' placeholder='Network password' required></li>"
+  "               <li><input type='text' class='form-control' name='password' placeholder='Network password' required></li>"
   "               <li><input type='submit' class='btn btn-primary btn-block' value='Save and reset'></li>"
   "             </form>"
   "           </ul>"
@@ -143,6 +143,9 @@ String list_item =
   " </span>"
   " <input type='range' min='0' max='100' id='range-$channel' data-channel='$channel' style='padding-top: 10px;'>"
   "</li>";
+
+
+String debug = "";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -193,6 +196,10 @@ String getWifi(String inputSsid = "", String inputPassword = "") {
 
 void configurationSetup() {
 
+  SPIFFS.begin();
+  
+debug += "In configurationSetup()<br>";
+Serial.println("In configurationSetup()");
   String channelsConfiguration = "";
   String wifiConfiguration = "";
 
@@ -203,7 +210,9 @@ void configurationSetup() {
   if (!channelsFile) {
 
     Serial.println("No channels configuration file detected.  Creating a new one.");
+debug += "No channels configuration file detected.  Creating a new one.<br>";    
     channelsFile = SPIFFS.open(CHANNELSFILENAME, "w");
+Serial.print("getChannel = "); Serial.println(getChannel());
     channelsFile.println(getChannel());
     channelsFile.close();
 
@@ -213,16 +222,18 @@ void configurationSetup() {
   while (channelsFile.available()) {
     channelsConfiguration += channelsFile.read();
   }
-
-
+debug += "Channels file: " + channelsConfiguration + "<br>";    
+Serial.println("Channels file:");
+Serial.println(channelsConfiguration);
   // Open the wifi configuration file, if it exists.
   File wifiFile = SPIFFS.open(WIFIFILENAME, "r");
 
   // Write the default configuration to the file.
   if (!wifiFile) {
-
+debug += "No wifi configuration file detected.  Creating a new one.<br>";  
     Serial.println("No wifi configuration file detected.  Creating a new one.");
     wifiFile = SPIFFS.open(WIFIFILENAME, "w");
+Serial.print("getWifi = "); Serial.println(getWifi());    
     wifiFile.println(getWifi());
     wifiFile.close();
 
@@ -232,12 +243,15 @@ void configurationSetup() {
   while (wifiFile.available()) {
     wifiConfiguration += wifiFile.read();
   }
-
+debug += "Wifi file: " + wifiConfiguration + "<br>";  
+Serial.println("Wifi file:");
+Serial.println(wifiConfiguration);
   StaticJsonBuffer<200> jsonBuffer;
   JsonObject& wifiJson = jsonBuffer.parseObject(wifiConfiguration);
 
   if (!wifiJson.success()) {
     Serial.println("JSON parsing of wifi configuration failed.  Setting default values.");
+debug += "JSON parsing of wifi configuration failed.  Setting default values.<br>";
     ssid = "";
     password = "";
   }
@@ -401,8 +415,12 @@ void root() {
 */
   //String bodyMarkup = body_open; //.replace("$ip", ipAddress);
   //bodyMarkup = bodyMarkup.replace("$strength", String(WiFi.RSSI()));
- 
-  server.send(200, "text/html", header + body_open + list_open + channelMarkup + list_close + body_close);
+
+  // Show the debug messages if a parameter is defined.
+  if (!server.hasArg("debug")) {
+    debug = "";
+  }
+  server.send(200, "text/html", header + body_open + list_open + channelMarkup + list_close + debug + body_close);
 }
 
 
@@ -463,7 +481,9 @@ void setvolume() {
 void network() {
 
   if (server.hasArg("ssid") && server.hasArg("password")) {
-    
+
+    SPIFFS.begin();
+
     // Open the wifi configuration file, if it exists.
     File wifiFile = SPIFFS.open(WIFIFILENAME, "w");
     wifiFile.println(getWifi((String)server.arg("ssid"), (String)server.arg("password")));
